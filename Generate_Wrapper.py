@@ -1,3 +1,6 @@
+# Created by Lin Min
+# Edits by Sean Pesce tagged with '@SP'
+
 import os.path;
 import sys;
 import subprocess as sub
@@ -6,10 +9,21 @@ import shutil;
 import time;
 
 # Info
-print ('Wrapper Generator. Copyright (C) Lin Min\n\n');
+print ('Wrapper Generator. Copyright (C) Lin Min\n');
 
-# Get the input parameter first.
+# Get the input parameters first.
 dllname = sys.argv[1];
+
+# @SP: Check for optional arguments:
+use_default_directory = False;
+allow_chains = False;
+if len(sys.argv) > 2 and sys.argv[2].lower()=='-usesysdir': # @SP: Check if the user would like the C++ project to load the original DLL from the system directory
+	use_default_directory = True;
+	print ('Wrapper will load original DLL from default system directory.');
+elif len(sys.argv) > 2 and sys.argv[2].lower()=='-allowchains': # @SP: Check if the user would like the C++ project to allow DLL chaining with additional DLL wrappers
+	allow_chains = True; # @TODO: implement DLL chaining
+	print ('Wrapper will allow DLL chaining.');
+print('\n');
 
 # Check whether is a dll file.
 if not dllname.endswith('.dll'):
@@ -94,6 +108,8 @@ if architecture == 'x64':  # For X64
 	f.write('extern \"C\" ');
 
 f.write('UINT_PTR mProcs['+str(len(LoadNames))+'] = {0};\n\n');
+if use_default_directory: # @SP
+	f.write('void LoadOriginalDll();\n\n');
 f.write('LPCSTR mImportNames[] = {');
 for idx, val in enumerate(LoadNames):
 	if idx is not 0:
@@ -106,9 +122,12 @@ f.write('\tif ( fdwReason == DLL_PROCESS_ATTACH ) {\n');
 # f.write('\t\tchar sysdir[255], path[255];\n');
 # f.write('\t\tGetSystemDirectory( sysdir, 254 );\n');
 # f.write('\t\tsprintf( path, \"%s\\\\ori_'+dllname+'\", sysdir );\n');
-f.write('\t\tmHinstDLL = LoadLibrary( \"ori_'+dllname+'\" );\n');
-f.write('\t\tif ( !mHinstDLL )\n');
-f.write('\t\t\treturn ( FALSE );\n');
+if not use_default_directory:	# @SP
+	f.write('\t\tmHinstDLL = LoadLibrary( \"ori_'+dllname+'\" );\n');
+	f.write('\t\tif ( !mHinstDLL )\n');
+	f.write('\t\t\treturn ( FALSE );\n');
+else:
+	f.write('\t\tLoadOriginalDll();\n');
 f.write('\t\tfor ( int i = 0; i < '+str(len(LoadNames))+'; i++ )\n');
 f.write('\t\t\tmProcs[ i ] = (UINT_PTR)GetProcAddress( mHinstDLL, mImportNames[ i ] );\n');
 f.write('\t} else if ( fdwReason == DLL_PROCESS_DETACH ) {\n');
@@ -123,6 +142,21 @@ if architecture == 'x64':
 else:
 	for idx, item in enumerate(WrapFcn):
 		f.write('extern \"C\" __declspec(naked) void __stdcall '+item+'(){__asm{jmp mProcs['+str(idx)+'*4]}}\n');
+if use_default_directory:
+	# @SP: Write LoadOriginalDll() function, which loads the original DLL from the default directory (so the original doesn't need to be included)
+	f.write('\n\n// Loads the original DLL from the default system directory\n');
+	f.write('//\tFunction originally written by Michael Koch\n');
+	f.write('void LoadOriginalDll()\n{\n');
+	f.write('\tchar buffer[MAX_PATH];\n\n');
+	f.write('\t// Get path to system dir and to '+dllname+'\n');
+	f.write('\tGetSystemDirectory(buffer, MAX_PATH);\n\n');
+	f.write('\t// Append DLL name\n');
+	f.write('\tstrcat_s(buffer, \"\\\\'+dllname+'\");\n\n');
+	f.write('\t// Try to load the system\'s '+dllname+', if pointer empty\n');
+	f.write('\tif (!mHinstDLL) mHinstDLL = LoadLibrary(buffer);\n\n');
+	f.write('\t// Debug\n\tif (!mHinstDLL)\n\t{\n');
+	f.write('\t\tOutputDebugString(\"PROXYDLL: Original '+dllname+' not loaded ERROR ****\\r\\n\");\n');
+	f.write('\t\tExitProcess(0); // Exit the hard way\n\t}\n}\n\n');
 f.close();
 
 
