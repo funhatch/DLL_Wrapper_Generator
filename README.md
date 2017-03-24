@@ -7,7 +7,7 @@ Automatically generates DLL wrappers for 32-bit and 64-bit DLLs.
 ## Usage  
   
 ```
-python Generate_Wrapper.py [-usesysdir | -allowchains]  
+python Generate_Wrapper.py DLLname.dll [-usesysdir | -allowchains]  
 
 	-usesysdir	Generated DLL will check the system default directory
 			for the original DLL, rather than checking the local
