@@ -21,7 +21,7 @@ if len(sys.argv) > 2 and sys.argv[2].lower()=='-usesysdir': # @SP: Check if the 
 	use_default_directory = True;
 	print ('Wrapper will load original DLL from default system directory.');
 elif len(sys.argv) > 2 and sys.argv[2].lower()=='-allowchains': # @SP: Check if the user would like the C++ project to allow DLL chaining with additional DLL wrappers
-	allow_chains = True; # @TODO: implement DLL chaining
+	allow_chains = True;
 	print ('Wrapper will allow DLL chaining.');
 print('\n');
 
@@ -108,8 +108,12 @@ if architecture == 'x64':  # For X64
 	f.write('extern \"C\" ');
 
 f.write('UINT_PTR mProcs['+str(len(LoadNames))+'] = {0};\n\n');
-if use_default_directory: # @SP
-	f.write('void LoadOriginalDll();\n\n');
+if use_default_directory or allow_chains: # @SP
+	f.write('void LoadOriginalDll();\n');
+if allow_chains:
+	f.write('int InitSettings();\n\n');
+else:
+	f.write('\n');
 f.write('LPCSTR mImportNames[] = {');
 for idx, val in enumerate(LoadNames):
 	if idx is not 0:
@@ -119,15 +123,19 @@ f.write('};\n');
 f.write('BOOL WINAPI DllMain( HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved ) {\n');
 f.write('\tmHinst = hinstDLL;\n');
 f.write('\tif ( fdwReason == DLL_PROCESS_ATTACH ) {\n');
-# f.write('\t\tchar sysdir[255], path[255];\n');
-# f.write('\t\tGetSystemDirectory( sysdir, 254 );\n');
-# f.write('\t\tsprintf( path, \"%s\\\\ori_'+dllname+'\", sysdir );\n');
-if not use_default_directory:	# @SP
+
+if use_default_directory: 	# @SP
+	f.write('\t\tLoadOriginalDll();\n');
+elif allow_chains:
+	f.write('\t\tInitSettings();\n');
+	f.write('\t\tif (!mHinstDLL)\n\t\t{\n');
+	f.write('\t\t\t// No chain was loaded; get original DLL from system directory\n');
+	f.write('\t\t\tLoadOriginalDll();\n\t\t}\n');
+else:
 	f.write('\t\tmHinstDLL = LoadLibrary( \"ori_'+dllname+'\" );\n');
+if not use_default_directory:
 	f.write('\t\tif ( !mHinstDLL )\n');
 	f.write('\t\t\treturn ( FALSE );\n');
-else:
-	f.write('\t\tLoadOriginalDll();\n');
 f.write('\t\tfor ( int i = 0; i < '+str(len(LoadNames))+'; i++ )\n');
 f.write('\t\t\tmProcs[ i ] = (UINT_PTR)GetProcAddress( mHinstDLL, mImportNames[ i ] );\n');
 f.write('\t} else if ( fdwReason == DLL_PROCESS_DETACH ) {\n');
@@ -142,7 +150,7 @@ if architecture == 'x64':
 else:
 	for idx, item in enumerate(WrapFcn):
 		f.write('extern \"C\" __declspec(naked) void __stdcall '+item+'(){__asm{jmp mProcs['+str(idx)+'*4]}}\n');
-if use_default_directory:
+if use_default_directory or allow_chains:
 	# @SP: Write LoadOriginalDll() function, which loads the original DLL from the default directory (so the original doesn't need to be included)
 	f.write('\n\n// Loads the original DLL from the default system directory\n');
 	f.write('//\tFunction originally written by Michael Koch\n');
@@ -157,8 +165,31 @@ if use_default_directory:
 	f.write('\t// Debug\n\tif (!mHinstDLL)\n\t{\n');
 	f.write('\t\tOutputDebugString(\"PROXYDLL: Original '+dllname+' not loaded ERROR ****\\r\\n\");\n');
 	f.write('\t\tExitProcess(0); // Exit the hard way\n\t}\n}\n\n');
+if allow_chains:
+	# @SP: Write InitSettings() function, which loads the next wrapper DLL in the chain (if one exists)
+	f.write('\n// Parses '+dllname.replace('.dll','.ini')+' for intialization settings\n');
+	f.write('int InitSettings()\n{\n');
+	f.write('\tchar dll_chain_buffer[128];\n\n\t// Check settings file for DLL chain\n');
+	f.write('\tGetPrivateProfileString(\"'+dllname.replace('.dll','')+'\", "DLL_Chain", NULL, dll_chain_buffer, 128, \".\\\\'+dllname.replace('.dll','.ini')+'\");\n\n');
+	f.write('\tif (dll_chain_buffer[0] != \'\\0\') // Found DLL_Chain entry in settings file\n\t{\n');
+	f.write('\t\tmHinstDLL = LoadLibrary(dll_chain_buffer);\n');
+	f.write('\t\tif (!mHinstDLL)\n\t\t{\n');
+	f.write('\t\t\t// Failed to load next wrapper DLL\n');
+	f.write('\t\t\tOutputDebugString(\"PROXYDLL: Failed to load chained DLL; loading original from system directory instead...\\r\\n\");\n');
+	f.write('\t\t\treturn 2; // Return 2 if given DLL could not be loaded\n\t\t}\n\t}\n')
+	f.write('\telse\n\t{\n');
+	f.write('\t\tOutputDebugString(\"PROXYDLL: No DLL chain specified; loading original from system directory...\\r\\n\");\n');
+	f.write('\t\treturn 1; // Return 1 if '+dllname.replace('.dll','.ini')+' or DLL_Chain entry could not be located\n\t}\n');
+	f.write('\treturn 0; // Return 0 on success\n}\n\n');
 f.close();
 
+# @SP: Generate .ini file (if "-allowchains" was specified)
+if allow_chains:
+	print ('Generating .ini file');
+	f = open(dllname.replace('.dll','.ini'),'w');
+	f.write('['+dllname.replace('.dll','')+']\n');
+	f.write('DLL_Chain=\n\n');
+	f.close();
 
 # Generate ASM File
 print ('Generating .asm file');
@@ -223,6 +254,8 @@ if architecture == 'x64':
 	shutil.move(dllname.replace('.dll','.cpp'),dllname.replace('.dll','')+'\\'+dllname.replace('.dll','')+'\\');
 	shutil.move(dllname.replace('.dll','.def'),dllname.replace('.dll','')+'\\'+dllname.replace('.dll','')+'\\');
 	shutil.move(dllname.replace('.dll','_asm.asm'),dllname.replace('.dll','')+'\\'+dllname.replace('.dll','')+'\\');
+	if allow_chains: # @SP: move the .ini file
+		shutil.move(dllname.replace('.dll','.ini'),dllname.replace('.dll','')+'\\'+dllname.replace('.dll','')+'\\');
 
 else:
 	sln = open('Visual Studio Project Template\\x86\\MyName.sln','r');
@@ -265,3 +298,5 @@ else:
 	
 	shutil.move(dllname.replace('.dll','.cpp'),dllname.replace('.dll','')+'\\'+dllname.replace('.dll','')+'\\');
 	shutil.move(dllname.replace('.dll','.def'),dllname.replace('.dll','')+'\\'+dllname.replace('.dll','')+'\\');
+	if allow_chains: # @SP: move the .ini file
+		shutil.move(dllname.replace('.dll','.ini'),dllname.replace('.dll','')+'\\'+dllname.replace('.dll','')+'\\');
