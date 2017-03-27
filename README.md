@@ -14,7 +14,7 @@ python Generate_Wrapper.py DLLname.dll [-usesysdir | -allowchains]
 			directory for "ori_$(DLLname).dll"  
       
 	-allowchains	Generated DLL will parse "$(DLLname).ini" for a
-			"DLL_Chain " entry containing the name of a local DLL
+			"DLL_Chain=" entry containing the name of a local DLL
 			to load. This allows multiple DLL wrappers to be loaded
 			for the same DLL. If no entry is found, generated DLL
 			checks the system default directory for the original DLL.  
