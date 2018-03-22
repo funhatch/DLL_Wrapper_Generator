@@ -1,5 +1,5 @@
 # DLL Wrapper Generator  
-Author: Lin Min  
+
   
 ## Description  
 Automatically generates DLL wrappers for 32-bit and 64-bit DLLs.  
@@ -19,8 +19,13 @@ python Generate_Wrapper.py DLLname.dll [-usesysdir | -allowchains]
 			for the same DLL. If no entry is found, generated DLL
 			checks the system default directory for the original DLL.  
 ```  
+
+
+## Authors  
+ * **Lin "MavenLin" Min** - Original author  - [GitHub](https://github.com/mavenlin)  
+ * **Sean Pesce** - Extended functionality - [Website](https://SeanPesce.github.io) | [GitHub](https://github.com/SeanPesce)  
    
   
-## Source  
+## Original Source  
 https://github.com/mavenlin/Dll_Wrapper_Gen  
   
