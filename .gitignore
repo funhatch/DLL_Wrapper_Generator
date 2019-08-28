@@ -375,4 +375,6 @@ pip-log.txt
 GoogleCustomSearchEngineID*
 GoogleCustomSearchEngineKey*
 
+# VS Code
+.vscode/
 
