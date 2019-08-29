@@ -378,3 +378,5 @@ GoogleCustomSearchEngineKey*
 # VS Code
 .vscode/
 
+XInput1_4/
+XInput1_4.dll
