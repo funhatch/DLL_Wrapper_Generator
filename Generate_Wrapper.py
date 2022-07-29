@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # Created by Lin Min
 # Edits by Sean Pesce tagged with '@SP'
 
@@ -9,7 +10,7 @@ import shutil;
 import time;
 
 # Info
-print ('Wrapper Generator. Copyright (C) Lin Min\n');
+print('Wrapper Generator. Copyright (C) Lin Min\n');
 
 # Get the input parameters first.
 dllname = sys.argv[1];
@@ -19,23 +20,23 @@ use_default_directory = False;
 allow_chains = False;
 if len(sys.argv) > 2 and sys.argv[2].lower()=='-usesysdir': # @SP: Check if the user would like the C++ project to load the original DLL from the system directory
 	use_default_directory = True;
-	print ('Wrapper will load original DLL from default system directory.');
+	print('Wrapper will load original DLL from default system directory.');
 elif len(sys.argv) > 2 and sys.argv[2].lower()=='-allowchains': # @SP: Check if the user would like the C++ project to allow DLL chaining with additional DLL wrappers
 	allow_chains = True;
-	print ('Wrapper will allow DLL chaining.');
+	print('Wrapper will allow DLL chaining.');
 print('\n');
 
 # Check whether is a dll file.
 if not dllname.endswith('.dll'):
-	print ('You should pass a dll file to this program!');
+	print('You should pass a dll file to this program!');
 	sys.exit(1);
 
 # Check whether the dll file specified exists.
 if os.path.exists(dllname):
-	print ('#############################')
-	print ('Reading dll file ...');
+	print('#############################')
+	print('Reading dll file ...');
 else:
-	print ('The Specified file \"'+dllname+'\" does not exist!');
+	print('The Specified file \"'+dllname+'\" does not exist!');
 	sys.exit(1);
 
 # Check Architecture
@@ -44,13 +45,13 @@ p = sub.Popen('dumpbin_tools/dumpbin.exe /headers '+dllname,stdout=sub.PIPE,stde
 output, errors = p.communicate();
 output = output.decode('utf-8');
 if 'x86' in output:
-	print ('x86 dll detected ...');
+	print('x86 dll detected ...');
 	architecture = 'x86';
 elif 'x64' in output:
-	print ('x64 dll detected ...');
+	print('x64 dll detected ...');
 	architecture = 'x64';
 else:
-	print ('invalid dll file, exiting ...');
+	print('invalid dll file, exiting ...');
 	
 # Get Export List
 p = sub.Popen('dumpbin_tools/dumpbin.exe /exports '+dllname,stdout=sub.PIPE,stderr=sub.PIPE);
@@ -66,11 +67,11 @@ for line in lines:
 		idx3 = line.find('RVA');
 		idx4 = line.find('name');
 		continue;
-	if start is 1:
+	if start == 1:
 		start = 2;
 		continue;
-	if start is 2:
-		if len(line) is 0:
+	if start == 2:
+		if len(line) == 0:
 			break;
 		splt = re.compile("\s+").split(line.strip());
 
@@ -89,7 +90,7 @@ for line in lines:
 			DefItem.append(fcnname+'='+fcnname+'_wrapper'+' @'+ordinal);
 			
 # Generate Def File
-print ('Generating .def File');
+print('Generating .def File');
 f = open(dllname.replace('.dll','.def'),'w');
 f.write('LIBRARY '+dllname+'\n');
 f.write('EXPORTS\n');
@@ -98,7 +99,7 @@ for item in DefItem:
 f.close();
 
 # Generate CPP File
-print ('Generating .cpp file');
+print('Generating .cpp file');
 
 f = open(dllname.replace('.dll','.cpp'),'w');
 f.write('#include <windows.h>\n#include <stdio.h>\n');
@@ -116,7 +117,7 @@ else:
 	f.write('\n');
 f.write('LPCSTR mImportNames[] = {');
 for idx, val in enumerate(LoadNames):
-	if idx is not 0:
+	if idx != 0:
 		f.write(', ');
 	f.write(val);
 f.write('};\n');
@@ -185,16 +186,16 @@ f.close();
 
 # @SP: Generate .ini file (if "-allowchains" was specified)
 if allow_chains:
-	print ('Generating .ini file');
+	print('Generating .ini file');
 	f = open(dllname.replace('.dll','.ini'),'w');
 	f.write('['+dllname.replace('.dll','')+']\n');
 	f.write('DLL_Chain=\n\n');
 	f.close();
 
 # Generate ASM File
-print ('Generating .asm file');
+print('Generating .asm file');
 if architecture == 'x86':
-	print ('x86 wrapper will use inline asm.');
+	print('x86 wrapper will use inline asm.');
 else:
 	f = open(dllname.replace('.dll','_asm.asm'),'w');
 	f.write('.code\nextern mProcs:QWORD\n');
